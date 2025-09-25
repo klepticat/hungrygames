@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "hungrygames",
+  "version": "${version}",
+  "name": "HungryGames",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/hungrygames/icon.png",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "org.klepticat.hungrygames.Hungrygames"
+    ]
+  },
+  "mixins": [
+    "hungrygames.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "1.21.9-beta.4"
+  }
+}
