@@ -2,22 +2,24 @@ package org.klepticat.hungrygames.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.command.argument.EntityArgumentType;
-import net.minecraft.entity.Entity;
+import net.minecraft.component.type.ProfileComponent;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.SpawnReason;
 import net.minecraft.entity.decoration.DisplayEntity;
 import net.minecraft.network.packet.s2c.play.EntityPassengersSetS2CPacket;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
+import net.minecraft.text.object.PlayerTextObjectContents;
 import net.minecraft.util.math.AffineTransformation;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ColorHelper;
 import org.joml.AxisAngle4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import org.klepticat.hungrygames.Hungrygames;
+import org.klepticat.hungrygames.api.FallenManager;
 import org.klepticat.hungrygames.api.Screen;
 
 import static net.minecraft.server.command.CommandManager.argument;
@@ -31,47 +33,18 @@ public class FallenCommand {
         dispatcher.register(
                 literal("fallen")
                         .then(literal("start").executes(FallenCommand::startFallen))
-                        .then(literal("test").then(argument("entity", EntityArgumentType.entity()).executes(FallenCommand::testFallen)))
+                        .then(literal("dump").executes(FallenCommand::dumpFallen))
+                        .then(literal("clear").executes(FallenCommand::clearFallen))
+                        .then(literal("next").executes(FallenCommand::nextFallen))
         );
     }
 
     private static int startFallen(CommandContext<ServerCommandSource> context) {
         int successCount = 0;
 
-        Screen screen = new Screen(
-                new Vector3f(-0.5f, 0f, 0f),
-                new Quaternionf(new AxisAngle4f((float) (Math.PI/2), 0, 1, 0)).mul(new Quaternionf(new AxisAngle4f(0.1f, 1, 0, 0))),
-                0.1f
-        );
-
         for(ServerPlayerEntity player : context.getSource().getServer().getPlayerManager().getPlayerList()) {
-            DisplayEntity.TextDisplayEntity textDisplay = EntityType.TEXT_DISPLAY.spawn(player.getEntityWorld(), BlockPos.ofFloored(player.getPos()), SpawnReason.COMMAND);
-
-            if(textDisplay != null) {
-                textDisplay.setText(Text.literal("THE FALLEN"));
-
-                textDisplay.setYaw(0);
-
-                Vector3f screenPosition = new Vector3f(-0.5f, 0f, 0f);
-                Quaternionf screenRotation = new Quaternionf(new AxisAngle4f((float) (Math.PI/2), 0, 1, 0)).mul(new Quaternionf(new AxisAngle4f(0.1f, 1, 0, 0)));
-                float screenScale = 0.1f;
-
-
-
-                AffineTransformation transformation = new AffineTransformation(
-                        screen.makeOffset(new Vector3f(0f, 1f, 0f)),
-                        screen.rotation,
-                        new Vector3f(screenScale),
-                        null
-                );
-
-                textDisplay.setTransformation(transformation);
-
-                if(textDisplay.startRiding(player, true, false)) {
-                    player.networkHandler.send(new EntityPassengersSetS2CPacket(player), null);
-                    successCount++;
-                }
-            }
+            Hungrygames.fallenManager.initScreen(player);
+            successCount++;
         }
 
         int finalSuccessCount = successCount;
@@ -80,19 +53,44 @@ public class FallenCommand {
         return finalSuccessCount;
     }
 
-    private static int testFallen(CommandContext<ServerCommandSource> context) {
-        MinecraftServer server = context.getSource().getServer();
-        try {
-            Entity entity = EntityArgumentType.getEntity(context, "entity");
-            ServerPlayerEntity player = context.getSource().getPlayer();
+    private static int nextFallen(CommandContext<ServerCommandSource> context) {
+        ServerPlayerEntity fallen = Hungrygames.fallenManager.popNextFallen();
+        if(fallen == null) {
+            for(ServerPlayerEntity player : context.getSource().getServer().getPlayerManager().getPlayerList()) {
+                Hungrygames.fallenManager.killScreen(player);
+            }
 
-            boolean b = entity.startRiding(player, true, true);
-
-            context.getSource().sendFeedback(() -> Text.literal(String.valueOf(b)), true);
-            player.networkHandler.send(new EntityPassengersSetS2CPacket(player), null);
-            return b ? 1 : 0;
-        } catch (CommandSyntaxException e) {
-            throw new RuntimeException(e);
+            return 1;
         }
+
+        int count = 0;
+
+        for(ServerPlayerEntity player : context.getSource().getServer().getPlayerManager().getPlayerList()) {
+            Hungrygames.fallenManager.updateText(player, fallen.getDisplayName());
+            Hungrygames.fallenManager.updateIcon(player, fallen);
+            count++;
+        }
+
+        return count;
+    }
+
+    private static int dumpFallen(CommandContext<ServerCommandSource> context) {
+        Hungrygames.fallenManager.getQueueStream().forEachOrdered(player -> {
+            ProfileComponent profileComponent = ProfileComponent.ofStatic(player.getGameProfile());
+
+            context.getSource().sendFeedback(() -> Text.object(new PlayerTextObjectContents(profileComponent, true)), false);
+        });
+
+        return 1;
+    }
+
+    private static int clearFallen(CommandContext<ServerCommandSource> context) {
+        int clearCount = Hungrygames.fallenManager.getFallenCount();
+
+        Hungrygames.fallenManager.clearFallen();
+
+        context.getSource().sendFeedback(() -> Text.literal("Cleared %s Fallen from the queue".formatted(clearCount)), false);
+
+        return clearCount;
     }
 }
