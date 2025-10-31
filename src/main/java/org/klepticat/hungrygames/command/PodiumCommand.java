@@ -17,47 +17,47 @@ import java.util.Collection;
 
 import static net.minecraft.server.command.CommandManager.*;
 
-public class DistrictCommand {
+public class PodiumCommand {
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
         dispatcher.register(
-                literal("district")
+                literal("podium")
                         .requires(requirePermissionLevel(2))
                         .then(
                                 argument("player", GameProfileArgumentType.gameProfile())
-                                        .then(literal("set").then(argument("district", IntegerArgumentType.integer(0, 13)).executes(DistrictCommand::setPlayerDistrict)))
-                                        .then(literal("get").executes(DistrictCommand::getPlayerDistrict))
+                                        .then(literal("set").then(argument("podium", IntegerArgumentType.integer(-1, 15)).executes(PodiumCommand::setPlayerPodium)))
+                                        .then(literal("get").executes(PodiumCommand::getPlayerPodium))
                         )
 
         );
     }
 
-    private static int setPlayerDistrict(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+    private static int setPlayerPodium(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
         Collection<PlayerConfigEntry> players = GameProfileArgumentType.getProfileArgument(context, "player");
 
         players.forEach(playerConfigEntry -> {
 
 
-            byte district = (byte) IntegerArgumentType.getInteger(context, "district");
+            byte podium = (byte) IntegerArgumentType.getInteger(context, "podium");
 
             PlayerData playerData = ServerState.getPlayerState(playerConfigEntry.id(), context.getSource().getServer());
-            byte districtPrev = playerData.getDistrict();
+            byte podiumPrev = playerData.getPodium();
 
-            playerData.setDistrict(district);
+            playerData.setPodium(podium);
 
-            context.getSource().sendFeedback(() -> Text.literal("Updated %s's district from District %s to District %s".formatted(playerConfigEntry.name(), districtPrev, district)), true);
+            context.getSource().sendFeedback(() -> Text.literal("Updated %s's podium from Podium %s to Podium %s".formatted(playerConfigEntry.name(), podiumPrev, podium)), true);
         });
 
         return 1;
     }
 
-    private static int getPlayerDistrict(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+    private static int getPlayerPodium(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
         Collection<PlayerConfigEntry> players = GameProfileArgumentType.getProfileArgument(context, "player");
 
         players.forEach(playerConfigEntry -> {
             PlayerData playerData = ServerState.getPlayerState(playerConfigEntry.id(), context.getSource().getServer());
-            byte district = playerData.getDistrict();
+            byte podium = playerData.getPodium();
 
-            context.getSource().sendFeedback(() -> Text.literal("%s is assigned to District %s".formatted(playerConfigEntry.name(), district)), false);
+            context.getSource().sendFeedback(() -> Text.literal("%s is assigned to Podium %s".formatted(playerConfigEntry.name(), podium)), false);
         });
 
         return 1;
