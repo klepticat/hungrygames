@@ -13,6 +13,10 @@ public record LocationPosition(BlockPos pos, float pitch, float yaw) {
             ).apply(instance, LocationPosition::new)
     );
 
+    public BlockPos getBlockPos() {
+        return pos;
+    }
+
     public int x() {
         return pos.getX();
     }
@@ -23,6 +27,18 @@ public record LocationPosition(BlockPos pos, float pitch, float yaw) {
 
     public int z() {
         return pos.getZ();
+    }
+
+    public double centerX() {
+        return pos.toCenterPos().x;
+    }
+
+    public double centerY() {
+        return pos.toCenterPos().y;
+    }
+
+    public double centerZ() {
+        return pos.toCenterPos().z;
     }
 
     public String toString() {

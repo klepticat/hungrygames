@@ -58,6 +58,7 @@ public class GameStateCommand {
             case "interviews" -> ServerState.GameState.INTERVIEWS;
             case "game_waiting" -> ServerState.GameState.GAME_WAITING;
             case "game_active" -> ServerState.GameState.GAME_ACTIVE;
+            case "victory" -> ServerState.GameState.GAME_VICTORY;
             default -> null;
         };
 
@@ -68,8 +69,13 @@ public class GameStateCommand {
 
         context.getSource().sendFeedback(() -> Text.of("Transitioning gamestates from %s to %s".formatted(oldGameState.asString(), newGameState.asString())), true);
 
-        serverState.setGameState(oldGameState.transition(context.getSource().getServer(), newGameState));
+        try {
+            serverState.setGameState(oldGameState.transition(context.getSource().getServer(), newGameState));
+        } catch (Exception e) {
+            context.getSource().sendFeedback(() -> Text.of(e.toString()), true);
+        }
 
-        return newGameState.ordinal();
+
+        return 1;
     }
 }

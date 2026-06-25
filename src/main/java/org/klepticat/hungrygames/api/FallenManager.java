@@ -77,7 +77,7 @@ public class FallenManager {
 
             DisplayEntity.TextDisplayEntity textDisplay = addText(
                     player,
-                    Text.literal("DISTRICT 11"),
+                    Text.literal("THE FALLEN"),
                     textTransformation,
                     ColorHelper.getArgb(100, 255, 230),
                     (byte) (((float) (count - i) / (float) count) * 255)

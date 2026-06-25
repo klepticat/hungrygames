@@ -1,0 +1,14 @@
+{
+    "countdown.tick": {
+        "replace": "true",
+        "sounds": [
+            "hungrygames:countdown"
+        ]
+    },
+    "countdown.end": {
+        "replace": "true",
+        "sounds": [
+            "hungrygames:begin"
+        ]
+    }
+}

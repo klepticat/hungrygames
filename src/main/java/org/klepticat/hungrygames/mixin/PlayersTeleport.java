@@ -28,10 +28,12 @@ public class PlayersTeleport {
         boolean isTribute = ServerState.getPlayerState(player).getDistrict() != 0;
 
         if(trainingCenterActive && isTribute) {
-            teleportPlayer(player, _this,serverState.getTrainingSpawn());
+            teleportPlayerCenter(player, _this,serverState.getTrainingSpawn());
 
             player.getInventory().clear();
             player.clearStatusEffects();
+
+            player.changeGameMode(GameMode.ADVENTURE);
 
             player.addStatusEffect(new StatusEffectInstance(StatusEffects.SATURATION, -1, 255, true, false));
             player.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, -1, 255, true, false));
@@ -65,7 +67,7 @@ public class PlayersTeleport {
         boolean isTribute = ServerState.getPlayerState(player).getDistrict() != 0;
 
         if(trainingCenterActive && isTribute) {
-            teleportPlayer(player, _this,serverState.getTrainingSpawn());
+            teleportPlayerCenter(player, _this,serverState.getTrainingSpawn());
 
             player.getInventory().clear();
             player.clearStatusEffects();
@@ -74,7 +76,7 @@ public class PlayersTeleport {
             player.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, -1, 255, true, false));
         } else if(gameState == ServerState.GameState.GAME_ACTIVE) {
             teleportPlayer(player, _this,serverState.getArenaCenter());
-            player.changeGameMode(GameMode.SPECTATOR);
+            _this.getServer().execute(() -> _this.getServer().execute(() -> player.changeGameMode(GameMode.SPECTATOR)));
             player.removeCommandTag("alive");
         } else if(gameState == ServerState.GameState.INTERVIEWS) {
             if(!isTribute) {
@@ -98,5 +100,10 @@ public class PlayersTeleport {
     @Unique
     private static void teleportPlayer(ServerPlayerEntity player, ServerWorld world, LocationPosition location) {
         player.teleport(world, location.x(), location.y(), location.z(), Set.of(), location.yaw(), location.pitch(), true);
+    }
+
+    @Unique
+    private static void teleportPlayerCenter(ServerPlayerEntity player, ServerWorld world, LocationPosition location) {
+        player.teleport(world, location.centerX(), location.y(), location.centerZ(), Set.of(), location.yaw(), location.pitch(), true);
     }
 }

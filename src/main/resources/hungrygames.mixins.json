@@ -6,7 +6,7 @@
   "mixins": [],
   "server": [
     "PlayersRideable",
-    "PlayersDeath",
+    "PlayersDeathAndDamage",
     "PlayersTeleport"
   ],
   "injectors": {

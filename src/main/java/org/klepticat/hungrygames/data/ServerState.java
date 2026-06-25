@@ -2,14 +2,23 @@ package org.klepticat.hungrygames.data;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.block.Blocks;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.network.packet.s2c.play.PlaySoundS2CPacket;
+import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
+import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.scoreboard.AbstractTeam;
 import net.minecraft.scoreboard.Team;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvent;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.StringIdentifiable;
 import net.minecraft.util.Uuids;
 import net.minecraft.util.math.BlockPos;
@@ -19,11 +28,12 @@ import org.klepticat.hungrygames.api.LocationPosition;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 public class ServerState extends PersistentState {
     private HashMap<UUID, PlayerData> players;
 
-    private HashMap<Byte, BlockPos> podiums;
+    private HashMap<String, BlockPos> podiums;
 
     private LocationPosition arenaCenter;
     private LocationPosition interviewWaiting;
@@ -47,7 +57,7 @@ public class ServerState extends PersistentState {
 
     public static ServerState createFromCodec(
             Map<UUID, PlayerData> players,
-            Map<Byte, BlockPos> podiums,
+            Map<String, BlockPos> podiums,
             LocationPosition arenaCenter,
             LocationPosition interviewWaiting,
             LocationPosition interviewSpawn,
@@ -72,7 +82,7 @@ public class ServerState extends PersistentState {
 
     public static final Codec<ServerState> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.unboundedMap(Uuids.CODEC, PlayerData.CODEC).optionalFieldOf("players", Map.of()).forGetter(ServerState::getPlayers),
-            Codec.unboundedMap(Codec.BYTE, BlockPos.CODEC).optionalFieldOf("podiums", Map.of()).forGetter(ServerState::getPodiums),
+            Codec.unboundedMap(Codec.STRING, BlockPos.CODEC).optionalFieldOf("podiums", Map.of()).forGetter(ServerState::getPodiums),
             LocationPosition.CODEC.optionalFieldOf("arena_center", new LocationPosition(new BlockPos(0, 0, 0), 0, 0)).forGetter(ServerState::getArenaCenter),
             LocationPosition.CODEC.optionalFieldOf("interview_wait", new LocationPosition(new BlockPos(0, 0, 0), 0, 0)).forGetter(ServerState::getInterviewWaiting),
             LocationPosition.CODEC.optionalFieldOf("interview_spawn", new LocationPosition(new BlockPos(0, 0, 0), 0, 0)).forGetter(ServerState::getInterviewSpawn),
@@ -133,12 +143,12 @@ public class ServerState extends PersistentState {
         return trainingSpawn;
     }
 
-    public HashMap<Byte, BlockPos> getPodiums() {
+    public HashMap<String, BlockPos> getPodiums() {
         return podiums;
     }
 
     public BlockPos getPodium(byte i) {
-        return podiums.get(i);
+        return podiums.get(String.valueOf(i));
     }
 
     public GameState getGameState() {
@@ -161,8 +171,8 @@ public class ServerState extends PersistentState {
         this.trainingSpawn = trainingSpawn;
     }
 
-    public void setPodium(byte i, BlockPos podium) {
-        this.podiums.put(i, podium);
+    public void setPodium(int i, BlockPos podium) {
+        this.podiums.put(String.valueOf(i), podium);
     }
 
     public void clearPodiums() {
@@ -183,7 +193,9 @@ public class ServerState extends PersistentState {
         NONE(
                 "none",
                 (server) -> {
-
+                    server.getPlayerManager().getPlayerList().forEach(player -> {
+                        player.removeCommandTag("archery");
+                    });
                 },
                 server -> {
                     ServerState serverState = getServerState(server);
@@ -324,6 +336,7 @@ public class ServerState extends PersistentState {
                 (server) -> {
                     server.getPlayerManager().getPlayerList().forEach(player -> {
                         server.getScoreboard().clearTeam(player.getNameForScoreboard());
+                        player.removeCommandTag("alive");
                     });
                 },
                 server -> {
@@ -382,6 +395,10 @@ public class ServerState extends PersistentState {
 
                             player.getInventory().clear();
                             player.clearStatusEffects();
+                            player.setExperienceLevel(0);
+                            player.setExperiencePoints(0);
+
+                            player.sendMessage(Text.literal("[Peacekeeper] You've got ").append(Text.literal("sixty seconds ").formatted(Formatting.BOLD)).append(Text.literal("to get in that elevator, or you'll be shot for disrupting The Culling.")));
 
                             if(podium == -1) unassignedPlayers.add(player);
                             else assignedPlayers.add(player);
@@ -395,35 +412,62 @@ public class ServerState extends PersistentState {
                         }
                     });
 
-                    assignedPlayers.forEach(player -> {
-                        byte podium = ServerState.getPlayerState(player).getPodium();
+//                    assignedPlayers.forEach(player -> {
+//                        byte podium = ServerState.getPlayerState(player).getPodium();
+//
+//                        BlockPos podiumPos = serverState.getPodium(podium);
+//
+//                        if(podiumPos != null && unusedPodiums.contains(podium)) {
+//                            //player.teleport(world, podiumPos.getX() + 4, podiumPos.getY() - 1, podiumPos.getZ() + 3, Set.of(), 110, 0, true);
+//                        } else {
+//                            unassignedPlayers.add(player);
+//                        }
+//
+//                        unusedPodiums.remove(podium);
+//                    });
 
-                        BlockPos podiumPos = serverState.getPodium(podium);
+//                    unassignedPlayers.forEach(player -> {
+//                        byte podium = unusedPodiums.get(world.random.nextInt(unusedPodiums.stream().filter(Objects::nonNull).collect(Collectors.toSet()).size()));
+//
+//                        BlockPos podiumPos = serverState.getPodium(podium);
+//
+//                        if(podiumPos != null && unusedPodiums.contains(podium)) {
+//                            //player.teleport(world, podiumPos.getX() + 4, podiumPos.getY() - 1, podiumPos.getZ() + 3, Set.of(), 110, 0, true);
+//                        }
+//
+//                        unusedPodiums.remove(podium);
+//                    });
 
-                        if(podiumPos != null && unusedPodiums.contains(podium)) {
-                            player.teleport(world, podiumPos.getX() + 4, podiumPos.getY() - 1, podiumPos.getZ() + 3, Set.of(), 110, 0, true);
-                        } else {
-                            unassignedPlayers.add(player);
-                        }
+                    serverState.getPodiums().values().forEach(podiumPos -> {
+                        BlockPos piston = podiumPos.add(2, 4, 0);
+                        BlockPos glass1 = podiumPos.add(1, 0, 1);
+                        BlockPos glass2 = podiumPos.add(1, 1, 1);
+                        BlockPos glass3 = podiumPos.add(1, 2, 1);
+                        BlockPos platform = podiumPos.add(0, -1, 0);
+                        BlockPos podium = podiumPos.add(0, 23, 0);
 
-                        unusedPodiums.remove(podium);
-                        assignedPlayers.remove(player);
-                    });
+                        world.setBlockState(piston, Blocks.REDSTONE_TORCH.getDefaultState());
 
-                    unassignedPlayers.forEach(player -> {
-                        byte podium = unusedPodiums.get(world.random.nextInt(unusedPodiums.size()));
+                        world.setBlockState(glass1, Blocks.AIR.getDefaultState());
+                        world.setBlockState(glass2, Blocks.AIR.getDefaultState());
+                        world.setBlockState(glass3, Blocks.AIR.getDefaultState());
 
-                        BlockPos podiumPos = serverState.getPodium(podium);
-
-                        if(podiumPos != null && unusedPodiums.contains(podium)) {
-                            player.teleport(world, podiumPos.getX() + 4, podiumPos.getY() - 1, podiumPos.getZ() + 3, Set.of(), 110, 0, true);
-                        }
-
-                        unusedPodiums.remove(podium);
-                        unassignedPlayers.remove(player);
+                        world.setBlockState(platform, Blocks.SMOOTH_STONE.getDefaultState());
+                        world.setBlockState(podium, Blocks.AIR.getDefaultState());
                     });
 
                     GameStartCutscene.instance = new GameStartCutscene(server);
+                }),
+        GAME_VICTORY(
+                "victory",
+                (server) -> {
+
+                },
+                (server) -> {
+                    server.getPlayerManager().getPlayerList().forEach(player -> {
+                        player.networkHandler.sendPacket(new TitleS2CPacket(Text.literal("VICTORY!").formatted(Formatting.BOLD, Formatting.GOLD)));
+                        player.networkHandler.sendPacket(new PlaySoundS2CPacket(RegistryEntry.of(SoundEvent.of(Identifier.of("hungrygames", "victory"))), SoundCategory.MASTER, player.getX(), player.getY(), player.getZ(), 0.7f, 1.0f, 1L));
+                    });
                 });
 
         private final String id;
